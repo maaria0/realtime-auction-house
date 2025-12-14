@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Realtime Auction House</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Realtime Auction House</h1>
+      <p>Place bids, stay synced, never refresh.</p>
+    </header>
+
+    <main>
+      <section class="panel" id="user-panel">
+        <h2>Your Session</h2>
+        <form id="user-form">
+          <label>
+            User ID
+            <input type="number" id="user-id-input" min="1" required />
+          </label>
+          <button type="submit">Connect</button>
+        </form>
+        <p id="user-status">Not connected</p>
+      </section>
+
+      <section class="panel" id="create-panel">
+        <h2>List A New Item</h2>
+        <form id="create-auction-form">
+          <div class="form-grid">
+            <label>
+              Title
+              <input type="text" id="auction-title" required />
+            </label>
+            <label>
+              Image URL
+              <input type="url" id="auction-image" placeholder="https://..." />
+            </label>
+            <label class="full">
+              Description
+              <textarea id="auction-description" rows="3" required></textarea>
+            </label>
+            <label>
+              Start Time
+              <input type="datetime-local" id="auction-start" required />
+            </label>
+            <label>
+              End Time
+              <input type="datetime-local" id="auction-end" required />
+            </label>
+          </div>
+          <button type="submit">Create Auction</button>
+        </form>
+      </section>
+
+      <section class="panel" id="active-panel">
+        <div class="panel-header">
+          <h2>Active Auctions</h2>
+          <button id="refresh-active">Refresh</button>
+        </div>
+        <div id="active-auctions" class="auction-list"></div>
+      </section>
+
+      <section class="panel" id="selected-panel">
+        <h2>Selected Auction</h2>
+        <div id="selected-content" class="empty-state">
+          Join or select an active auction to bid.
+        </div>
+      </section>
+
+      <section class="panel" id="closed-panel">
+        <div class="panel-header">
+          <h2>Closed Auctions</h2>
+          <button id="refresh-closed">Refresh</button>
+        </div>
+        <div id="closed-auctions" class="auction-list"></div>
+      </section>
+    </main>
+
+    <div id="toast-container"></div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
