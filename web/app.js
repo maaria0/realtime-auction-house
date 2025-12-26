@@ -13,23 +13,20 @@ document.addEventListener("DOMContentLoaded", () => {
   bindForms();
   refreshAuctions();
   setInterval(() => refreshAuctions(false), 15_000);
+  setInterval(tickCountdowns, 1_000);
 });
 
 function bindForms() {
   const userForm = document.getElementById("user-form");
   userForm.addEventListener("submit", (e) => {
     e.preventDefault();
-    const id = Number(document.getElementById("user-id-input").value);
-    if (!id) {
-      showToast("Enter a valid user id", "warn");
+    const email = document.getElementById("user-email-input").value.trim();
+    const displayName = document.getElementById("user-name-input").value.trim();
+    if (!email) {
+      showToast("Enter a valid email", "warn");
       return;
     }
-    state.userId = id;
-    connectSocket();
-    document.getElementById(
-      "user-status"
-    ).textContent = `Connected as user #${id}`;
-    showToast(`Connected as user ${id}`);
+    registerUser(email, displayName || undefined);
   });
 
   const createForm = document.getElementById("create-auction-form");
@@ -120,6 +117,29 @@ async function refreshClosed(showToastOnError = true) {
   }
 }
 
+async function registerUser(email, displayName) {
+  try {
+    const response = await fetch(`${API_BASE}/users`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, displayName }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Unable to register user");
+    }
+    state.userId = Number(data.id);
+    connectSocket();
+    const label = data.display_name || data.email;
+    document.getElementById(
+      "user-status"
+    ).textContent = `Connected as ${label} (id ${data.id})`;
+    showToast(`Connected as ${label}`);
+  } catch (err) {
+    showToast(err.message, "warn");
+  }
+}
+
 function renderActive() {
   const container = document.getElementById("active-auctions");
   container.innerHTML = "";
@@ -140,11 +160,12 @@ function renderActive() {
 
     const meta = document.createElement("p");
     meta.className = "auction-meta";
+    const remainingSeconds = computeRemainingSeconds(auction);
     const bidText = auction.currentBid
       ? `Highest: ₹${auction.currentBid} (user ${auction.highestBidderId})`
       : "No bids yet";
     meta.textContent = `${bidText} • Ends in ${formatDuration(
-      auction.secondsRemaining
+      remainingSeconds
     )}`;
 
     const pill = document.createElement("span");
@@ -246,7 +267,7 @@ function renderSelected() {
   timing.innerHTML = `<strong>Ends:</strong> ${new Date(
     auction.endTime
   ).toLocaleString()} • <strong>Remaining:</strong> ${formatDuration(
-    auction.secondsRemaining
+    computeRemainingSeconds(auction)
   )}`;
 
   const price = document.createElement("p");
@@ -362,6 +383,21 @@ function formatDuration(seconds) {
     .toString()
     .padStart(2, "0");
   return h === "00" ? `${m}:${s}` : `${h}:${m}:${s}`;
+}
+
+function computeRemainingSeconds(auction) {
+  if (!auction?.endTime) return 0;
+  const endMs = new Date(auction.endTime).getTime();
+  const diffMs = endMs - Date.now();
+  return Math.max(0, Math.floor(diffMs / 1000));
+}
+
+function tickCountdowns() {
+  if (!state.active.length) return;
+  renderActive();
+  if (state.selectedAuctionId) {
+    renderSelected();
+  }
 }
 
 function showToast(message, tone = "info") {
