@@ -1,0 +1,25 @@
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  display_name TEXT
+);
+
+CREATE TABLE IF NOT EXISTS auctions (
+  id SERIAL PRIMARY KEY,
+  owner_id INTEGER REFERENCES users(id),
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  image_url TEXT,
+  start_time TIMESTAMPTZ NOT NULL,
+  end_time TIMESTAMPTZ NOT NULL,
+  status TEXT NOT NULL DEFAULT 'OPEN',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS bids (
+  id SERIAL PRIMARY KEY,
+  auction_id INTEGER REFERENCES auctions(id),
+  bidder_id INTEGER REFERENCES users(id),
+  amount NUMERIC(12,2) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

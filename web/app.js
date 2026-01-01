@@ -266,9 +266,9 @@ function renderSelected() {
   const timing = document.createElement("p");
   timing.innerHTML = `<strong>Ends:</strong> ${new Date(
     auction.endTime
-  ).toLocaleString()} • <strong>Remaining:</strong> ${formatDuration(
+  ).toLocaleString()} • <strong>Remaining:</strong> <span id="selected-remaining">${formatDuration(
     computeRemainingSeconds(auction)
-  )}`;
+  )}</span>`;
 
   const price = document.createElement("p");
   price.innerHTML = `<strong>Current Bid:</strong> ${
@@ -395,8 +395,18 @@ function computeRemainingSeconds(auction) {
 function tickCountdowns() {
   if (!state.active.length) return;
   renderActive();
-  if (state.selectedAuctionId) {
-    renderSelected();
+  updateSelectedCountdown();
+}
+
+function updateSelectedCountdown() {
+  if (!state.selectedAuctionId) return;
+  const auction = state.active.find(
+    (a) => a.id === state.selectedAuctionId
+  );
+  if (!auction) return;
+  const remaining = document.getElementById("selected-remaining");
+  if (remaining) {
+    remaining.textContent = formatDuration(computeRemainingSeconds(auction));
   }
 }
 

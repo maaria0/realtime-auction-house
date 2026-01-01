@@ -41,6 +41,16 @@ npm run dev    # nodemon reloads on save
 npm start
 ```
 
+### Database Migration (manual SQL)
+
+The initial schema is available at `server/migrations/001_init.sql`.
+
+Run it once against your database:
+
+```bash
+psql -h localhost -U auction_user -d auction -f server/migrations/001_init.sql
+```
+
 ### Frontend Setup
 
 The client is a static HTML/JS experience under `web/`. Serve it with any static server (examples below assume the backend runs on `http://localhost:4000`).
