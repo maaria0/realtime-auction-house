@@ -28,17 +28,24 @@ const numericIdSchema = z.preprocess((value) => {
   return undefined;
 }, z.number().int().positive());
 
+const imageSchema = z
+  .string()
+  .trim()
+  .refine(
+    (value) =>
+      value === "" ||
+      /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(value),
+    "Image must be a PNG, JPG, WEBP, or GIF upload"
+  )
+  .optional()
+  .transform((value) => (value ? value : undefined));
+
 const createAuctionSchema = z
   .object({
     ownerId: numericIdSchema,
     title: z.string().trim().min(3).max(120),
     description: z.string().trim().min(1),
-    imageUrl: z
-      .string()
-      .trim()
-      .url()
-      .optional()
-      .or(z.literal("").transform(() => undefined)),
+    imageUrl: imageSchema,
     startTime: isoDateSchema,
     endTime: isoDateSchema,
   })

@@ -28,7 +28,7 @@ app.use(
     },
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 
 app.get("/", (req, res) => res.send("Auction backend running"));
 
