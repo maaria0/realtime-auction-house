@@ -58,9 +58,20 @@ function Toasts({ toasts }) {
   );
 }
 
+function loadStoredSession() {
+  try {
+    const raw = localStorage.getItem("auctionSession");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 function App() {
-  const [userId, setUserId] = useState(null);
-  const [userLabel, setUserLabel] = useState(null);
+  const stored = loadStoredSession();
+  const [userId, setUserId] = useState(stored ? stored.userId : null);
+  const [userLabel, setUserLabel] = useState(stored ? stored.userLabel : null);
+  const [token, setToken] = useState(stored ? stored.token : null);
   const [active, setActive] = useState([]);
   const [closed, setClosed] = useState([]);
   const [selectedAuctionId, setSelectedAuctionId] = useState(null);
@@ -72,6 +83,7 @@ function App() {
   useEffect(() => {
     refreshAuctions();
     refreshClosed();
+    if (stored) connectSocket(stored.token);
   }, []);
 
   useInterval(() => refreshAuctions(false), 15000);
@@ -110,30 +122,67 @@ function App() {
     }
   }
 
-  async function registerUser(email, displayName) {
+  function completeAuth(data) {
+    const uid = Number(data.id);
+    const label = data.display_name || data.email;
+    setUserId(uid);
+    setUserLabel(label);
+    setToken(data.token);
+    localStorage.setItem(
+      "auctionSession",
+      JSON.stringify({ userId: uid, userLabel: label, token: data.token })
+    );
+    pushToast(`Connected as ${label}`);
+    connectSocket(data.token);
+  }
+
+  async function registerUser(email, password, displayName) {
     try {
-      const response = await fetch(`${API_BASE}/users`, {
+      const response = await fetch(`${API_BASE}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, displayName }),
+        body: JSON.stringify({ email, password, displayName }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Unable to register user");
-      setUserId(Number(data.id));
-      setUserLabel(data.display_name || data.email);
-      pushToast(`Connected as ${data.display_name || data.email}`);
-      connectSocket(Number(data.id));
+      if (!response.ok) throw new Error(data.error || "Unable to register");
+      completeAuth(data);
     } catch (err) {
       pushToast(err.message, "warn");
     }
   }
 
-  function connectSocket(uid) {
+  async function loginUser(email, password) {
+    try {
+      const response = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to log in");
+      completeAuth(data);
+    } catch (err) {
+      pushToast(err.message, "warn");
+    }
+  }
+
+  function logout() {
+    if (socket) socket.disconnect();
+    localStorage.removeItem("auctionSession");
+    setSocket(null);
+    setToken(null);
+    setUserId(null);
+    setUserLabel(null);
+    setJoinedAuctions(new Set());
+    pushToast("Logged out");
+  }
+
+  function connectSocket(authToken) {
     if (socket) socket.disconnect();
     const s = io(API_BASE, { transports: ["websocket", "polling"] });
     setSocket(s);
     s.on("connect", () => {
-      s.emit("AUTH", { userId: uid });
+      s.emit("AUTH", { token: authToken });
       for (const id of joinedAuctions) {
         s.emit("JOIN_AUCTION", { auctionId: id });
       }
@@ -167,15 +216,18 @@ function App() {
   }
 
   async function submitBid(auctionId, amount) {
-    if (!userId) {
+    if (!token) {
       pushToast("Connect a user first", "warn");
       return;
     }
     try {
       const response = await fetch(`${API_BASE}/auctions/${auctionId}/bids`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bidderId: userId, amount }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ amount }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to place bid");
@@ -187,15 +239,17 @@ function App() {
   }
 
   async function createAuction(form) {
-    if (!userId) return pushToast("Connect a user before creating auctions", "warn");
+    if (!token) return pushToast("Connect a user before creating auctions", "warn");
     try {
       const { title, description, imageFile, start, end } = form;
       const imageUrl = imageFile ? await readImageFile(imageFile) : undefined;
       const response = await fetch(`${API_BASE}/auctions`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
-          ownerId: userId,
           title,
           description,
           imageUrl: imageUrl || undefined,
@@ -232,11 +286,17 @@ function App() {
         "section",
         { className: "panel", id: "user-panel" },
         h("h2", null, "Your Session"),
-        h(UserForm, { onRegister: registerUser, userLabel }),
+        h(UserForm, { onRegister: registerUser, onLogin: loginUser, userLabel }),
         h(
           "p",
           { id: "user-status" },
-          userLabel ? `Connected as ${userLabel} (id ${userId})` : "Not connected"
+          userLabel ? `Connected as ${userLabel} (id ${userId})` : "Not connected",
+          userLabel &&
+            h(
+              "button",
+              { className: "secondary", onClick: logout },
+              "Log Out"
+            )
         )
       ),
       h(
@@ -289,19 +349,25 @@ function App() {
   );
 }
 
-function UserForm({ onRegister, userLabel }) {
+function UserForm({ onRegister, onLogin, userLabel }) {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [mode, setMode] = useState("login");
+
   return h(
     "form",
     {
       id: "user-form",
       onSubmit: (e) => {
         e.preventDefault();
-        if (!email) return;
-        onRegister(email, name || undefined);
-        setEmail("");
-        setName("");
+        if (!email || !password) return;
+        if (mode === "register") {
+          onRegister(email, password, name || undefined);
+        } else {
+          onLogin(email, password);
+        }
+        setPassword("");
       },
     },
     h(
@@ -318,14 +384,36 @@ function UserForm({ onRegister, userLabel }) {
     h(
       "label",
       null,
-      "Display Name",
+      "Password",
       h("input", {
-        type: "text",
-        value: name,
-        onChange: (e) => setName(e.target.value),
+        type: "password",
+        value: password,
+        onChange: (e) => setPassword(e.target.value),
+        minLength: 8,
+        required: true,
       })
     ),
-    h("button", { type: "submit" }, userLabel ? "Reconnect" : "Connect")
+    mode === "register" &&
+      h(
+        "label",
+        null,
+        "Display Name",
+        h("input", {
+          type: "text",
+          value: name,
+          onChange: (e) => setName(e.target.value),
+        })
+      ),
+    h("button", { type: "submit" }, mode === "register" ? "Register" : "Log In"),
+    h(
+      "button",
+      {
+        type: "button",
+        className: "secondary",
+        onClick: () => setMode((m) => (m === "register" ? "login" : "register")),
+      },
+      mode === "register" ? "Have an account? Log in" : "New here? Register"
+    )
   );
 }
 

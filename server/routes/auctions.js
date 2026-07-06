@@ -2,6 +2,7 @@ const express = require("express");
 const { z } = require("zod");
 
 const pool = require("../db");
+const { requireAuth } = require("../middleware/auth");
 const {
   hasAuctionEnded,
   isAuctionActive,
@@ -19,15 +20,6 @@ const isoDateSchema = z.preprocess((value) => {
   return parsed;
 }, z.date());
 
-const numericIdSchema = z.preprocess((value) => {
-  if (typeof value === "number") return value;
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number(value);
-    return Number.isNaN(parsed) ? undefined : parsed;
-  }
-  return undefined;
-}, z.number().int().positive());
-
 const imageSchema = z
   .string()
   .trim()
@@ -42,7 +34,6 @@ const imageSchema = z
 
 const createAuctionSchema = z
   .object({
-    ownerId: numericIdSchema,
     title: z.string().trim().min(3).max(120),
     description: z.string().trim().min(1),
     imageUrl: imageSchema,
@@ -54,7 +45,7 @@ const createAuctionSchema = z
     path: ["endTime"],
   });
 
-router.post("/", async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   let parsed;
   try {
     parsed = createAuctionSchema.parse(req.body);
@@ -63,14 +54,14 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: issues });
   }
 
-  const { ownerId, title, description, imageUrl, startTime, endTime } = parsed;
+  const { title, description, imageUrl, startTime, endTime } = parsed;
 
   try {
     const result = await pool.query(
       `INSERT INTO auctions (owner_id, title, description, image_url, start_time, end_time, status)
        VALUES ($1,$2,$3,$4,$5,$6,'OPEN')
        RETURNING *`,
-      [ownerId, title, description, imageUrl || null, startTime, endTime]
+      [req.userId, title, description, imageUrl || null, startTime, endTime]
     );
     return res.status(201).json(formatAuction(result.rows[0]));
   } catch (err) {

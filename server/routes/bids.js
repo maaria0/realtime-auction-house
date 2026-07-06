@@ -1,12 +1,14 @@
 const express = require("express");
 const pool = require("../db");
+const { requireAuth } = require("../middleware/auth");
 const { emitNewBid, emitOutbid } = require("../sockets/auctionSocket");
 
 const router = express.Router();
 
 /**
  * POST /auctions/:id/bids
- * Body: { bidderId: number, amount: number }
+ * Body: { amount: number }
+ * Requires: Authorization: Bearer <token>
  *
  * Rules:
  * - Owner cannot bid
@@ -15,13 +17,13 @@ const router = express.Router();
  * - Next bid >= current + 1
  * - Concurrency-safe using SELECT ... FOR UPDATE
  */
-router.post("/:id/bids", async (req, res) => {
+router.post("/:id/bids", requireAuth, async (req, res) => {
   const auctionId = Number(req.params.id);
-  const bidderId = Number(req.body.bidderId);
+  const bidderId = req.userId;
   const amount = Number(req.body.amount);
 
-  if (!auctionId || !bidderId || !Number.isFinite(amount)) {
-    return res.status(400).json({ error: "Invalid auctionId/bidderId/amount" });
+  if (!auctionId || !Number.isFinite(amount)) {
+    return res.status(400).json({ error: "Invalid auctionId/amount" });
   }
 
   const client = await pool.connect();

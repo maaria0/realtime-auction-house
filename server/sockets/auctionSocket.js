@@ -1,13 +1,20 @@
+const { verifyToken } = require("../middleware/auth");
+
 // Very simple in-memory map: userId -> socketId
 // (For MVP. Later you can support multiple sockets per user.)
 const userSockets = new Map();
 
 function initAuctionSocket(io) {
   io.on("connection", (socket) => {
-    // Client should call: socket.emit("AUTH", { userId })
-    socket.on("AUTH", ({ userId }) => {
-      if (!userId) return;
-      userSockets.set(String(userId), socket.id);
+    // Client should call: socket.emit("AUTH", { token })
+    socket.on("AUTH", ({ token }) => {
+      if (!token) return;
+      try {
+        const userId = verifyToken(token);
+        userSockets.set(String(userId), socket.id);
+      } catch (err) {
+        // invalid/expired token: ignore, socket stays unauthenticated
+      }
     });
 
     // Client should call: socket.emit("JOIN_AUCTION", { auctionId })

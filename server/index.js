@@ -6,7 +6,7 @@ const { Server } = require("socket.io");
 
 const auctionRoutes = require("./routes/auctions");
 const bidRoutes = require("./routes/bids");
-const userRoutes = require("./routes/users");
+const authRoutes = require("./routes/auth");
 const { initAuctionSocket } = require("./sockets/auctionSocket");
 const { startAuctionCloser } = require("./jobs/auctionCloser");
 
@@ -34,7 +34,7 @@ app.get("/", (req, res) => res.send("Auction backend running"));
 
 app.use("/auctions", auctionRoutes);
 app.use("/auctions", bidRoutes);
-app.use("/", userRoutes);
+app.use("/auth", authRoutes);
 
 // Create HTTP server + attach socket.io
 const server = http.createServer(app);
