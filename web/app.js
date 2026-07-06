@@ -335,6 +335,17 @@ function CreateForm({ onCreate }) {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [imageFile, setImageFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+
+  useEffect(() => {
+    if (!imageFile) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(imageFile);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imageFile]);
 
   return h(
     "form",
@@ -381,10 +392,19 @@ function CreateForm({ onCreate }) {
           "div",
           {
             className: `file-input-display${!imageFile ? " empty" : ""}`,
-            onClick: () => document.getElementById("auction-image").click(),
           },
           imageFile
-            ? imageFile.name
+            ? h(
+                "span",
+                { className: "file-chosen" },
+                previewUrl &&
+                  h("img", {
+                    src: previewUrl,
+                    alt: "Selected preview",
+                    className: "file-preview-thumb",
+                  }),
+                imageFile.name
+              )
             : h(
                 "span",
                 null,

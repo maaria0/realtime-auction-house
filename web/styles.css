@@ -154,7 +154,12 @@ textarea:focus {
 }
 
 input[type="file"] {
-  display: none;
+  position: absolute;
+  left: -9999px;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
 }
 
 .file-input-display {
@@ -174,6 +179,20 @@ input[type="file"] {
 
 .file-button {
   opacity: 0.6;
+}
+
+.file-chosen {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.file-preview-thumb {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 2px;
+  border: 1px solid #d1d5db;
 }
 
 button {
